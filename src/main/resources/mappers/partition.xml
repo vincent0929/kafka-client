@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.vincent.kafka.db.mapper.PartitionMapper">
+
+    <select id="getByTopicAndPartition" resultType="kafkaPartition">
+        select * from kafka_partition where topic = #{topic} and partition_index = #{partitionIndex}
+    </select>
+
+    <insert id="save" parameterType="kafkaPartition">
+        insert into kafka_partition(topic, partition_index, partition_offset)
+        values (#{topic}, #{partitionIndex}, #{partitionOffset})
+    </insert>
+
+</mapper>
