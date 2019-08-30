@@ -5,7 +5,9 @@ import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Properties;
@@ -45,13 +47,12 @@ public class Producer implements Runnable {
                 int partition = metadata.partition();
                 long offset = metadata.offset();
                 String timeStamp = DateTimeFormatter.ISO_DATE_TIME.format(LocalDateTime.ofEpochSecond(metadata.timestamp() / 1000,
-                        0, ZoneOffset.UTC));
+                        0, ZoneId.systemDefault().getRules().getOffset(Instant.now())));
                 log.info("消息发送成功,producer={},message={},partition={},offset={},timestamp={}", Thread.currentThread().getName(), message, partition, offset, timeStamp);
             } else {
                 log.error("消息发送失败", e);
             }
         });
-
     }
 
     @Override
