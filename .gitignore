@@ -30,6 +30,7 @@ out/
 .DS_Store
 
 logs/
+log/
 ### macOS template
 # General
 .DS_Store
