@@ -7,6 +7,7 @@ import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.WakeupException;
 
 import java.time.Duration;
 import java.util.*;
@@ -109,6 +110,7 @@ public class ConcurrentConsumer extends Thread {
 
     public void shutdown() {
         this.enable = false;
+        this.consumer.wakeup();
         this.interrupt();
         if (ArrayUtils.isEmpty(workers)) {
             return;
@@ -122,42 +124,46 @@ public class ConcurrentConsumer extends Thread {
 
     @Override
     public void run() {
-        status = 1;
-        while (enable) {
-            try {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-                if (records == null || records.isEmpty()) {
-                    Thread.sleep(1000);
-                    continue;
-                }
-                CountDownLatch countDownLatch = new CountDownLatch(records.count());
-                for (TopicPartition topicPartition : records.partitions()) {
-                    List<ConsumerRecord<String, String>> partitionRecords = records.records(topicPartition);
-                    int partition = topicPartition.partition();
-                    ConsumerWorker worker = this.workers[partition];
-                    if (worker != null) {
-                        worker.push(partitionRecords, countDownLatch);
-                    } else {
-                        for (int i = 0; i < partitionRecords.size(); i++) {
-                            countDownLatch.countDown();
+        try {
+            status = 1;
+            while (enable) {
+                try {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+                    if (records == null || records.isEmpty()) {
+                        Thread.sleep(1000);
+                        continue;
+                    }
+                    CountDownLatch countDownLatch = new CountDownLatch(records.count());
+                    for (TopicPartition topicPartition : records.partitions()) {
+                        List<ConsumerRecord<String, String>> partitionRecords = records.records(topicPartition);
+                        int partition = topicPartition.partition();
+                        ConsumerWorker worker = this.workers[partition];
+                        if (worker != null) {
+                            worker.push(partitionRecords, countDownLatch);
+                        } else {
+                            for (int i = 0; i < partitionRecords.size(); i++) {
+                                countDownLatch.countDown();
+                            }
                         }
                     }
-                }
-                countDownLatch.await();
+                    countDownLatch.await();
 
-                loopCount++;
-                if (loopCount % 5 == 0) {
-                    loopCount = 0;
-                    this.consumer.commitSync(offsets);
-                } else {
-                    this.consumer.commitAsync(offsets, null);
+                    loopCount++;
+                    if (loopCount % 5 == 0) {
+                        loopCount = 0;
+                        this.consumer.commitSync(offsets);
+                    } else {
+                        this.consumer.commitAsync(offsets, null);
+                    }
+                } catch (WakeupException | InterruptedException e) {
+                    // ignore
                 }
-            } catch (InterruptedException e) {
-                // ignore
             }
+            this.consumer.commitSync(offsets);
+            status = 2;
+        } finally {
+            this.consumer.close();
         }
-        this.consumer.commitSync(offsets);
-        status = 2;
     }
 
     public static void main(String[] args) throws InterruptedException {
