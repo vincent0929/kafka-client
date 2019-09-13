@@ -59,9 +59,10 @@ public class ConsumerWorker extends Thread {
                 consume(record);
                 offsets.put(new TopicPartition(record.topic(), record.partition()),
                         new OffsetAndMetadata(record.offset() + 1));
-                this.countDownLatch.countDown();
             } catch (Exception e) {
                 // ignore
+            } finally {
+                this.countDownLatch.countDown();
             }
         }
         log.info("销毁kafka-consumer-{}", partition);
